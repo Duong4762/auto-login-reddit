@@ -1,0 +1,28 @@
+db:
+  url: "jdbc:postgresql://localhost:5436/ga"
+  username: "postgres"
+  password: "postgres"
+  timeoutSeconds: 15
+
+bot:
+  pollIntervalMs: 30000
+  groupCode: ""
+
+tmproxy:
+  apiKeys:
+    - "your-tmproxy-key-1"
+  location: 2
+  isp: 1
+
+gpm:
+  address: "http://127.0.0.1:19995"
+  browserCore: "chromium"
+  browserVersion: "139.0.7258.139"
+  startupUrl: "https://www.reddit.com"
+
+security:
+  aesDecryptKey: ""
+
+action:
+  viewPostMin: 2
+  viewPostMax: 5
