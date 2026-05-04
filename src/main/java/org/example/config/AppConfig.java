@@ -3,7 +3,12 @@ package org.example.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,17 +19,44 @@ public class AppConfig {
     private GpmConfig gpm = new GpmConfig();
     private SecurityConfig security = new SecurityConfig();
     private ActionConfig action = new ActionConfig();
+    private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
+    private static final String CONFIG_FILE_NAME = "application.yml";
 
     public static AppConfig load() {
-        try (InputStream inputStream = AppConfig.class.getClassLoader().getResourceAsStream("application.yml")) {
+        Path localPath = resolveLocalConfigPath();
+        if (Files.exists(localPath)) {
+            try (InputStream inputStream = new FileInputStream(localPath.toFile())) {
+                return YAML_MAPPER.readValue(inputStream, AppConfig.class);
+            } catch (Exception ex) {
+                throw new RuntimeException("Cannot load config from " + localPath, ex);
+            }
+        }
+        try (InputStream inputStream = AppConfig.class.getClassLoader().getResourceAsStream(CONFIG_FILE_NAME)) {
             if (inputStream == null) {
                 throw new IllegalStateException("Missing application.yml in resources");
             }
-            ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-            return mapper.readValue(inputStream, AppConfig.class);
+            return YAML_MAPPER.readValue(inputStream, AppConfig.class);
         } catch (Exception ex) {
             throw new RuntimeException("Cannot load application.yml", ex);
         }
+    }
+
+    public void save() {
+        Path localPath = resolveLocalConfigPath();
+        try {
+            Files.createDirectories(localPath.getParent());
+            YAML_MAPPER.writeValue(localPath.toFile(), this);
+        } catch (IOException ex) {
+            throw new RuntimeException("Cannot save config to " + localPath, ex);
+        }
+    }
+
+    private static Path resolveLocalConfigPath() {
+        Path projectPath = Paths.get(System.getProperty("user.dir"), "src", "main", "resources", CONFIG_FILE_NAME);
+        if (Files.exists(projectPath)) {
+            return projectPath;
+        }
+        return Paths.get(System.getProperty("user.dir"), CONFIG_FILE_NAME);
     }
 
     public BotConfig getBot() {

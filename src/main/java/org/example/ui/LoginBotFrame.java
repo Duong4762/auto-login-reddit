@@ -17,15 +17,15 @@ import java.util.Arrays;
 import java.util.List;
 
 public class LoginBotFrame extends JFrame {
-    private final JTextField dbUrlField = new JTextField("jdbc:postgresql://localhost:5436/ga");
-    private final JTextField dbUserField = new JTextField("postgres");
-    private final JPasswordField dbPasswordField = new JPasswordField("postgres");
+    private final JTextField dbUrlField = new JTextField();
+    private final JTextField dbUserField = new JTextField();
+    private final JPasswordField dbPasswordField = new JPasswordField();
     private final JTextField groupCodeField = new JTextField();
     private final JTextArea proxyKeysArea = new JTextArea(3, 30);
-    private final JTextField gpmAddressField = new JTextField("http://127.0.0.1:19995");
-    private final JTextField gpmCoreField = new JTextField("chromium");
-    private final JTextField gpmVersionField = new JTextField("139.0.7258.139");
-    private final JTextField gpmStartupUrlField = new JTextField("https://www.reddit.com");
+    private final JTextField gpmAddressField = new JTextField();
+    private final JTextField gpmCoreField = new JTextField();
+    private final JTextField gpmVersionField = new JTextField();
+    private final JTextField gpmStartupUrlField = new JTextField();
     private final JPasswordField aesKeyField = new JPasswordField();
     private final JButton runButton = new JButton("Chạy");
     private final JLabel infoLabel = new JLabel("Sẵn sàng");
@@ -40,6 +40,7 @@ public class LoginBotFrame extends JFrame {
     };
 
     public LoginBotFrame() {
+        AppConfig initialConfig = AppConfig.load();
         setTitle("Login Bot Reddit");
         setSize(1200, 720);
         setLocationRelativeTo(null);
@@ -80,6 +81,7 @@ public class LoginBotFrame extends JFrame {
         add(topPanel, BorderLayout.NORTH);
         add(tableScroll, BorderLayout.CENTER);
 
+        applyInitialConfig(initialConfig);
         runButton.addActionListener(e -> startRun());
     }
 
@@ -96,6 +98,14 @@ public class LoginBotFrame extends JFrame {
         }
 
         AppConfig config = buildConfigFromForm(groupCode, aesKey);
+        try {
+            config.save();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Không lưu được cấu hình: " + ex.getMessage(),
+                    "Lỗi lưu cấu hình",
+                    JOptionPane.WARNING_MESSAGE);
+        }
         runButton.setEnabled(false);
         tableModel.setRowCount(0);
         infoLabel.setText("Đang tải danh sách tài khoản...");
@@ -116,7 +126,7 @@ public class LoginBotFrame extends JFrame {
 
                 for (AccountInfo account : accounts) {
                     int row = addInitialRow(account);
-                    publish(new RowUpdate(row, account.getCode(), account.getUsername(), "ĐANG LOGIN", "Đang chuẩn bị proxy"));
+                    publish(new RowUpdate(row, account.getCode(), account.getUsername(), "ĐANG XỬ LÝ", "Đang lấy proxy"));
 
                     String proxy = proxyManager.nextProxy();
                     if (proxy == null || proxy.isBlank()) {
@@ -124,6 +134,7 @@ public class LoginBotFrame extends JFrame {
                         continue;
                     }
 
+                    publish(new RowUpdate(row, account.getCode(), account.getUsername(), "ĐANG XỬ LÝ", "Đang mở profile GPM"));
                     GpmOpenResult gpmOpenResult = gpmService.openOrCreateProfile(account.getUsername(), proxy);
                     if (!gpmOpenResult.success()) {
                         publish(new RowUpdate(row, account.getCode(), account.getUsername(), "THẤT BẠI",
@@ -132,6 +143,7 @@ public class LoginBotFrame extends JFrame {
                     }
 
                     try {
+                        publish(new RowUpdate(row, account.getCode(), account.getUsername(), "ĐANG LOGIN", "Đang login Reddit và view home"));
                         String password = CryptoUtil.aesDecrypt(account.getEncryptedPassword(), aesKey);
                         RedditActionService.LoginResult result = redditActionService.loginAndViewHome(
                                 account.getUsername(), password, gpmOpenResult.remoteDebugAddress()
@@ -202,6 +214,19 @@ public class LoginBotFrame extends JFrame {
                 .toList();
         config.getTmproxy().setApiKeys(keys);
         return config;
+    }
+
+    private void applyInitialConfig(AppConfig config) {
+        dbUrlField.setText(config.getDb().getUrl());
+        dbUserField.setText(config.getDb().getUsername());
+        dbPasswordField.setText(config.getDb().getPassword());
+        groupCodeField.setText(config.getBot().getGroupCode());
+        aesKeyField.setText(config.getSecurity().getAesDecryptKey());
+        gpmAddressField.setText(config.getGpm().getAddress());
+        gpmCoreField.setText(config.getGpm().getBrowserCore());
+        gpmVersionField.setText(config.getGpm().getBrowserVersion());
+        gpmStartupUrlField.setText(config.getGpm().getStartupUrl());
+        proxyKeysArea.setText(String.join(System.lineSeparator(), config.getTmproxy().getApiKeys()));
     }
 
     private void addField(JPanel panel, GridBagConstraints gbc, String label, JComponent field) {

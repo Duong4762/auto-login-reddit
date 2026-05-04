@@ -11,6 +11,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 public class AccountDbService {
     private static final Logger log = LoggerFactory.getLogger(AccountDbService.class);
@@ -45,10 +46,15 @@ public class AccountDbService {
         List<AccountInfo> accounts = new ArrayList<>();
         try {
             DriverManager.setLoginTimeout(config.getDb().getTimeoutSeconds());
+            Properties props = new Properties();
+            props.setProperty("user", config.getDb().getUsername());
+            props.setProperty("password", config.getDb().getPassword());
+            // Some environments use legacy Asia/Saigon timezone which newer Postgres
+            // servers reject. Force a valid timezone for this JDBC session.
+            props.setProperty("options", "-c TimeZone=Asia/Ho_Chi_Minh");
             try (Connection connection = DriverManager.getConnection(
                     config.getDb().getUrl(),
-                    config.getDb().getUsername(),
-                    config.getDb().getPassword());
+                    props);
                  PreparedStatement statement = connection.prepareStatement(SQL_GET_REDDIT_ACCOUNTS_BY_GROUP)) {
                 statement.setString(1, groupCode);
                 try (ResultSet rs = statement.executeQuery()) {
